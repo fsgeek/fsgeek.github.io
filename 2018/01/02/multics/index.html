@@ -1,0 +1,77 @@
+<p><a href="https://dl.acm.org/citation.cfm?id=1463915"><em>A General-Purpose File System For Secondary Storage</em></a></p>
+
+<p><em>R. C. Daley and P.G. Neumann</em></p>
+
+<p><em>Published in the Proceedings of the <a href="https://www.google.ca/url?sa=t&amp;rct=j&amp;q=&amp;esrc=s&amp;source=web&amp;cd=1&amp;cad=rja&amp;uact=8&amp;ved=0ahUKEwj45KfB66jYAhUS_mMKHfEhClgQFggpMAA&amp;url=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FAmerican_Federation_of_Information_Processing_Societies&amp;usg=AOvVaw3ByICgxkPQi-1fG-gxMmtT">American Federation of Information Processing Societies</a> 1965, Fall Joint Computer Conference, vol. 27, pp. 213-229.</em></p>
+
+<p>This is the seminal paper discussing how file systems were envisioned within the <a href="https://en.wikipedia.org/wiki/Multics">MULTICS operating system</a>. While you can still run MULTICS, it is a curiosity at this point.  However, virtually all operating systems we now use today descended from MULTICS and thus, its design profoundly influenced their development.</p>
+
+<p>This paper is a delightfully easy read, written at the dawn of this new field of multi-programming. Prior to this time computers were essentially single user.  The introduction of the idea of <em>sharing</em> a computer with other users was nascent.  Thus, the experts working in the field at the time had to begin thinking about things like organization, security, and sharing.</p>
+
+<p>Indeed, a common tension in operating systems literature in general is between isolation and sharing.  Isolation is great from a security perspective, but is inefficient.  Each user of the system often uses the same programs, for example, but we do not want to keep a distinct copy of the same thing for <em>each user</em> as that would be wasteful.   This profoundly impacts the file systems work because the file system is the point of persistence, the level at which shared resources become manifest.</p>
+
+<p>But I’m jumping ahead at this point.  Let’s start with the simple question: <strong>What is a file system</strong>?  As we will find during this journey, its meaning and usage is far richer than one might think upon first reading.  While this paper is not the first paper to discuss storage and file systems, it is a good example of the state of the art in 1965.</p>
+
+<p>This paper offers us some useful definitions:</p>
+
+<blockquote>
+  <p><em>A <strong>file</strong> is simply an ordered sequence of elements, where an element could be a machine word, a character, or a bit, depending upon the implementation.</em></p>
+</blockquote>
+
+<p>That seems to be a rather broad definition, but it is a reasonable place for us to start.  This does not impose structure on the content itself, which proves to be one reason why this abstraction ultimately turns out to be a powerful one.  “<em>At the level of the file system, a file is formatless.</em>”</p>
+
+<p>This paper also establishes the name space abstractions as well:</p>
+
+<blockquote>
+  <p><em>As far as a particular user is concerned, a file has one name, and that name is symbolic.  (Symbolic names may be arbitrarily long, and may have syntax of their own.  For example, they may consist of several parts, some of which are relevant to the nature of the file, e.g., ALPHA FAP DEBUG.)</em></p>
+</blockquote>
+
+<p>This again paints a rather broad abstraction.  The name has meaning to the user, but otherwise is just symbolic data for the file system.  The paper goes on to define the now classic name space specific abstraction:</p>
+
+<blockquote>
+  <p><em>A <strong>directory</strong> is a special file which is maintained by the file system, and which contains a list of <strong>entries</strong>.  To a user, an entry appears to be a file and is accessed in terms of its symbolic entry name, which is the user’s file name.  An <strong>entry name</strong> need be unique only within the directory in which it occurs.</em></p>
+</blockquote>
+
+<p> </p>
+
+<p><a href="https://i2.wp.com/fsgeek.ca/wp-content/uploads/2018/01/multics-hiearchy.png?ssl=1"><img class="size-medium wp-image-233 alignleft" src="https://i2.wp.com/fsgeek.ca/wp-content/uploads/2018/01/multics-hiearchy.png?resize=219%2C143&#038;ssl=1" alt="" width="219" height="143" srcset="https://i2.wp.com/fsgeek.ca/wp-content/uploads/2018/01/multics-hiearchy.png?w=219&amp;ssl=1 219w, https://i2.wp.com/fsgeek.ca/wp-content/uploads/2018/01/multics-hiearchy.png?resize=75%2C50&amp;ssl=1 75w" sizes="(max-width: 219px) 100vw, 219px" data-recalc-dims="1" /></a></p>
+
+<p>Thus, this paper lays out the quintessential aspect of modern file system name spaces: they are hierarchically organized.  The paper describes this in greater detail and refers to <strong>links</strong> and <strong>branches_._</strong></p>
+
+<p>The authors describe how users might work in different parts of the hierarchical name space.  They observe that this then creates a situation in which sharing of files might be an issue, and thus they introduce the concept of links to resolve this.</p>
+
+<p>[</p>
+
+<p><img class="size-medium wp-image-232 alignright" src="https://i2.wp.com/fsgeek.ca/wp-content/uploads/2018/01/multics-hiearchy-with-links.png?resize=226%2C144&#038;ssl=1" alt="" width="226" height="144" data-recalc-dims="1" />](https://fsgeek.ca/wp-content/uploads/2018/01/multics-hiearchy-with-links.png)</p>
+
+<p>A <strong>link</strong> in this context is an entry in a directory that refers to an existing file within the file system.  Thus, we see the genesis of links, though the paper does not clearly delineate symbolic links from hard links.  This does help motivate why these features show up in UNIX a number of years later, however.</p>
+
+<p>The paper goes into greater detail about how they envision this hierarchical name space functioning, including traversal, working directory, and links.</p>
+
+<p>From there the authors then turn their attention to a problem inherent in having a single shared file system name space with data contents belonging to different users, namely managing access to the individual files.  Thus, they introduce <strong>access controls</strong>.  They note that a file system could default to either permissive or restrictive access within this model.  From this point they incorporate the <strong>access control list</strong>, the access <strong>mode</strong> for a given file, and the concept of access <strong>attributes</strong>.  Of the five attributes listed, four of them are familiar: <strong>read, execute, write</strong>, and <strong>append</strong> access have analogs in modern file systems.  The fifth, <strong>trap</strong> is interesting, in that it defines an explicit exception mechanism for access control that requires external validation for access – an interesting generality that is not typically present in modern file systems.</p>
+
+<p>They also describe file sharing, introducing the concept of explicit operations to lock access to a given file, or to unlock the file.  They suggest that a locked file would require the user provide a designated key to permit accessing the file; I have seen this approach in some file systems, actually, though it is fairly uncommon.</p>
+
+<p>The paper describes access control at length with no real surprises otherwise, other than perhaps the fact that many of these features disappeared from later operating systems, only to be resurrected and added many years later.</p>
+
+<p>There is quite a bit in the paper about backup and restore processing.  Much of the detail here is interesting historically but does not really add much to my exploration of file systems.  If you are looking for more information about the history of backup, I do encourage you to read those sections.  Having done magnetic tape backups in the past, I’m content with leaving them be.</p>
+
+<p>There is one observation I will point out from this section, however.  The authors actually discuss a recurring theme in file systems – the fact that storage itself ends up being a multi-level media management challenge.</p>
+
+<blockquote>
+  <p><em>In most cases a user does not need to know how or where a file is stored by the file system.  A user’s primary concern is that the file be readily available to him when he needs it.  In general, only the file system knows on which device a file resides.</em></p>
+
+  <p><em>The file system is designed to accommodate any configuration of secondary storage devices.  These devices may cover a wide range of speeds and capacities.  All considerations of speed and efficiency of storage devices are left to the file system.  Thus all user programs and all other system programs are independent of the particular configuration of secondary storage</em>.</p>
+</blockquote>
+
+<p>They go on to describe migration of data from hot to cold storage as needed and point out these are functions of the file system.  I found this an interesting insight since even today we routinely deal with these sorts of situations, such as the Strata paper from SOSP 2017 (“<a href="https://www.cs.utexas.edu/~simon/sosp17-final207.pdf">Strata: a Cross Media File System</a>“).</p>
+
+<p>The remainder of the paper focuses on how the file system is implemented in MULTICS</p>
+
+<p><a href="https://i0.wp.com/fsgeek.ca/wp-content/uploads/2018/01/multics-basic-file-system.png?ssl=1"><img class="size-medium wp-image-231 alignleft" src="https://i0.wp.com/fsgeek.ca/wp-content/uploads/2018/01/multics-basic-file-system.png?resize=300%2C204&#038;ssl=1" alt="" width="300" height="204" srcset="https://i0.wp.com/fsgeek.ca/wp-content/uploads/2018/01/multics-basic-file-system.png?resize=300%2C204&amp;ssl=1 300w, https://i0.wp.com/fsgeek.ca/wp-content/uploads/2018/01/multics-basic-file-system.png?resize=75%2C50&amp;ssl=1 75w, https://i0.wp.com/fsgeek.ca/wp-content/uploads/2018/01/multics-basic-file-system.png?w=464&amp;ssl=1 464w" sizes="(max-width: 300px) 100vw, 300px" data-recalc-dims="1" /></a>I must admit, I found this section of the paper both detailed and yet fascinating because of the broad sweeping nature in which the authors lay down fundamental ideas that we see in modern operating systems.  Some of it is not really in the scope of file systems (“segment management” which appears to equate to shared executables, such as programs and shared libraries in modern systems,) the concept of demand segment loading (which presages demand paging,) the concept of file system search, mechanisms for managing file systems, memory recycling (reminiscent of page reclamation in modern virtual memory systems based upon its description,) device management, and I/O queueing.  They finish up by describing their “multilevel storage management module”, backup system, and utility functions.  The latter has (now) amusing functions like “file to cards” and “tape to file”.</p>
+
+<p>So these give us asynchronous operation, paging, backup, hierarchical storage management, security, file sharing, and directory sharing.  Most of these concepts survive to this day.  Indeed, what I found most surprising after reading this paper is how few of these ideas disappeared: traps and file system search are the two that spring to my mind.</p>
+
+<p>Thus the lesson of today’s paper: in 1965 the MULTICS team more or less laid down a model for how file systems were to work in virtually all modern operating systems.   The subsequent work will provide us with greater insight into the details, but the basic <em>shape</em> of our file systems has not strayed far from this early vision.</p>
+
+<p> </p>

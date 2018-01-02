@@ -1,0 +1,33 @@
+<p>I have made it a goal for 2018 to answer a question several people have asked me: <em>what papers should I read to learn more about file systems.</em> So I’ve decided to attempt to copy a format that I’ve found useful – <a href="https://blog.acolyer.org">The Morning Paper</a>. I admit, I am not sure I’ll be able to keep up the frenetic pace of a paper each day that he maintains, but I do know there are plenty of papers to read.</p>
+
+<p>My motivation for doing this is simple: there are quite a few papers on this topic, I certainly haven’t read them all (or even the majority of them) and reading through them, along with my own interpretation of why the paper matters to File Systems will be useful for me.  It also gives me a set of information that I can point out to people that ask me “so what should I read to learn more about this topic.”</p>
+
+<p>Why File Systems?  For me it’s been largely a quirk of fate.  I’ve been working on operating systems for many years now, and file systems happens to be the area in which I’ve spent more time than any other.  For something that is conceptually so simple – after all, it <em>just</em> maps files to blocks on your disk, it has considerable complexity.  File systems are also the gateway to one of the more challenging parts of the operating system: the bit that stores <strong>persistent state</strong>.  Errors in file systems are often <em>not</em> transient.  That makes them challenging.  The bar is set high because we don’t want to lose anyone’s data.</p>
+
+<p>File systems are part of the plumbing of the operating system.  They are essential to proper operation but when everything is working properly, nobody <em>really</em> notices they are there.  Only when things go wrong does anyone notice.  So it is within this world that I will delve.</p>
+
+<p>The place to start is to even attempt to define file systems.  While you might think this is simple, it turns out to be surprisingly challenging.  So I’ll approach it by providing some examples and then delving into what means to be a file system.</p>
+
+<h1 id="media-file-systems">Media File Systems</h1>
+
+<p>The easiest place to start is in the concept of the media file system.  “Media” in this context means any tangible medium on which we can systematically record and/or read persistent information.  Examples would include disks, <a href="http://searchstorage.techtarget.com/definition/tape-drive">tapes</a>, <a href="https://en.wikipedia.org/wiki/Non-volatile_memory">non-volatile memory</a>, or <a href="http://searchstorage.techtarget.com/definition/optical-media">optical media</a>. Whether or not <a href="https://en.wikipedia.org/wiki/List_of_RAM_drive_software">RAM file systems</a> fall into this category is an interesting question – and it helps demonstrate my point that pinning down this concept is more challenging than one might otherwise think.</p>
+
+<p><a href="https://techterms.com/definition/diskdrive">Disk drives</a> are typically what most people think of first for this category, though we now often view solid-state disk drives in the same category.  File systems reside on top of media devices and keep track of the organization of the data itself.  Some file systems can span multiple disk, or use transactional journals, or provide resilience against errors in the media itself.  The continuum here is surprisingly broad, but in the end the purpose of the file system is to map from the vagaries of the media to a (mostly) uniform model of behavior so application programs “just work”.</p>
+
+<h1 id="network-file-systems">Network File Systems</h1>
+
+<p>As we added computers to networks, we found it useful to be able to transfer information stored on one computer to another.  This permitted applications to access data, regardless of where it was actually stored.  By constructing a file system that uses a remote access protocol, we can present the remote storage device to the local system <strong>as if</strong> it were just a local file system – or rather, almost the same.</p>
+
+<p>Good examples of this include the Network File System (<a href="https://en.wikipedia.org/wiki/Network_File_System">NFS</a>) originally developed by SUN Microsystems in the 1980s and the Andrew File System (<a href="https://en.wikipedia.org/wiki/Andrew_File_System">AFS</a>) originally developed by Carnegie-Mellon University in the same time period.  These days many people also use the Server Message Block (<a href="https://en.wikipedia.org/wiki/Server_Message_Block">SMB</a>) based network file systems; the roots of this <em>are</em> also back in the 1980s.  All three of these remain in use today, in fact, though they have evolved from the earliest versions.</p>
+
+<h1 id="key-value-stores">Key-Value Stores</h1>
+
+<p>There is considerable overlap between the world of file systems and databases.  Several early file systems were really just single level lookup mechanisms, rather than the hierarchical name space that is so common these days.  It is actually common to implement file systems so that hierarchy is added to a flat indexed name space (a “flat” file system).  These are in essence one form of key-value store.  Some file systems permit addressing by using keys, whether explicitly assigned or implicitly generated.  A subsection of the literature focus more on this type of file system and I will make sure to cover several of these.</p>
+
+<h1 id="name-spaces">Name Spaces</h1>
+
+<p>Sometimes a file system is more about the namespace than anything else.  For example the <a href="https://en.wikipedia.org/wiki/Procfs"><strong>proc file system</strong></a> does not actually reside on top of any sort of storage.  The name space provides a convenient way to find information that is generated <strong>on demand</strong>.  In these cases, it is the name space that really matters, not how the information is stored.</p>
+
+<p>This conflation of storage, presentation, and name-space add to the richness and complexity of work being done in file systems.  My goal is to explore these issues, by reviewing the literature.</p>
+
+<p>#</p>

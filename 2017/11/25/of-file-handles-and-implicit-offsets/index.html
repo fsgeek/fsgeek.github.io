@@ -1,0 +1,146 @@
+<p>My current research direction (which is wandering a bit, as is common with research) has forced me to look as some of the vagaries of the POSIX interface.  One of these is this intriguing decision to incorporate a piece of file descriptor specific state for the “file pointer” (note that in Windows there is an exact equivalent in the <strong>CurrentByteOffset</strong> of the file handle).</p>
+
+<p>One thing to note about POSIX is that it was not <em>designed</em> initially.  Rather, it captured the state of UNIX systems in the 1980s and codify it.  Thus, rather than <em>inventing</em> this behavior, POSIX (or officially, <a href="http://ieeexplore.ieee.org/document/182902/">IEEE Std. 1003.1-1988</a>)  codified a uniform interface  acceptable to a variety of parties.  Like any standards document, it is a compromise that attempts to mollify a variety of different players.</p>
+
+<p>Here is a version of the Linux in-kernel file structure (from the main linux repository as of this morning):</p>
+
+<pre class="brush: cpp; highlight: [20]; title: ; notranslate" title="">struct file {
+	union {
+		struct llist_node	fu_llist;
+		struct rcu_head 	fu_rcuhead;
+	} f_u;
+	struct path		f_path;
+	struct inode		*f_inode;	/* cached value */
+	const struct file_operations	*f_op;
+
+	/*
+	 * Protects f_ep_links, f_flags.
+	 * Must not be taken from IRQ context.
+	 */
+	spinlock_t		f_lock;
+	enum rw_hint		f_write_hint;
+	atomic_long_t		f_count;
+	unsigned int 		f_flags;
+	fmode_t			f_mode;
+	struct mutex		f_pos_lock;
+	loff_t			f_pos;
+	struct fown_struct	f_owner;
+	const struct cred	*f_cred;
+	struct file_ra_state	f_ra;
+
+	u64			f_version;
+#ifdef CONFIG_SECURITY
+	void			*f_security;
+#endif
+	/* needed for tty driver, and maybe others */
+	void			*private_data;
+
+#ifdef CONFIG_EPOLL
+	/* Used by fs/eventpoll.c to link all the hooks to this file */
+	struct list_head	f_ep_links;
+	struct list_head	f_tfile_llink;
+#endif /* #ifdef CONFIG_EPOLL */
+	struct address_space	*f_mapping;
+	errseq_t		f_wb_err;
+} __randomize_layout
+  __attribute__((aligned(4)));	/* lest something weird decides that 2 is OK */
+
+</pre>
+
+<p>Note the <strong>f_pos </strong>field (which I’ve highlighted).  This is the file pointer and it allows things like <strong>read</strong> and <strong>write</strong> to work without an explicit offset value.</p>
+
+<p>Here’s the equivalent structure in Windows 10:</p>
+
+<pre class="brush: cpp; highlight: [22]; title: ; notranslate" title="">typedef struct _FILE_OBJECT {
+    CSHORT Type;
+    CSHORT Size;
+    PDEVICE_OBJECT DeviceObject;
+    PVPB Vpb;
+    PVOID FsContext;
+    PVOID FsContext2;
+    PSECTION_OBJECT_POINTERS SectionObjectPointer;
+    PVOID PrivateCacheMap;
+    NTSTATUS FinalStatus;
+    struct _FILE_OBJECT *RelatedFileObject;
+    BOOLEAN LockOperation;
+    BOOLEAN DeletePending;
+    BOOLEAN ReadAccess;
+    BOOLEAN WriteAccess;
+    BOOLEAN DeleteAccess;
+    BOOLEAN SharedRead;
+    BOOLEAN SharedWrite;
+    BOOLEAN SharedDelete;
+    ULONG Flags;
+    UNICODE_STRING FileName;
+    LARGE_INTEGER CurrentByteOffset;
+    __volatile ULONG Waiters;
+    __volatile ULONG Busy;
+    PVOID LastLock;
+    KEVENT Lock;
+    KEVENT Event;
+    __volatile PIO_COMPLETION_CONTEXT CompletionContext;
+    KSPIN_LOCK IrpListLock;
+    LIST_ENTRY IrpList;
+    __volatile PVOID FileObjectExtension;
+} FILE_OBJECT;
+typedef struct _FILE_OBJECT *PFILE_OBJECT; 
+</pre>
+
+<p>I highlighted the equivalent field for this structure (from <strong>wdm.h</strong> in the Windows 10 WDK).  I spent some time looking through the various fields and my observation is that this is the only piece of implicit user-visible shared _mutable _state.</p>
+
+<p>This actually doesn’t work in multi-threaded environments (very common these days) if threads use the same file descriptor (file handle in Windows) since it doesn’t make any sense to arbitrarily interleave reads.  In those environments, you use a different call – <strong>pread</strong> for POSIX systems, and in Windows it is explicit parameter in the native system call (<strong>NtReadFile</strong> where it is an <em>optional</em> parameter).</p>
+
+<p>This led me to ask the question: <strong>why is this here</strong>?  I haven’t found a definitive source since this predates the original POSIX specification, but my theory is that it is because it is the only way to properly implement sharing of the file descriptor.  When UNIX added the fork call, one of the characteristics of it was “inheritance of file descriptors”.</p>
+
+<pre>The child inherits copies of the parent's set of open file
+          descriptors.  Each file descriptor in the child refers to the same
+          open file description (see <a href="http://man7.org/linux/man-pages/man2/open.2.html">open(2)</a>) as the corresponding file
+          descriptor in the parent.  This means that the two file
+          descriptors share open file status flags, file offset, and signal-
+          driven I/O attributes (see the description of <b>F_SETOWN </b>and
+          <b>F_SETSIG </b>in <a href="http://man7.org/linux/man-pages/man2/fcntl.2.html">fcntl(2)</a>).
+
+(Source: http://man7.org/linux/man-pages/man2/fork.2.html)
+</pre>
+
+<p>The status flags describe how the file was opened so they aren’t changing (immutable). The addition of <strong>F_SETOWN</strong> and <strong>F_SETSIG</strong></p>
+
+<p>is more recent but it does appear to be <em>explicitly mutable</em> state (it allows programmatic changes).</p>
+
+<p>Fork is not the only way that a file descriptor (or file handle). For example, <a href="https://stackoverflow.com/questions/28003921/sending-file-descriptor-by-linux-socket/">it can be done</a></p>
+
+<p>using UNIX domain sockets on UNIX and Linux systems. Windows provides a system call for doing something similar</p>
+
+<p>as well (the documented version is <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff566445(v=vs.85).aspx"><strong>ZwDuplicateObject</strong></a>).</p>
+
+<p>I’ve spent time thinking about this and it seems that the reason to maintain this shared state is to ensure</p>
+
+<p>that two processes sharing the same file descriptor/handle get the same position pointer value. This</p>
+
+<p>then let me to ask <em>why is this useful</em>?</p>
+
+<p>I have been able to construct a single scenario in which this is useful: appending to the end of a shared file.</p>
+
+<p>Interleaving reads doesn’t make much sense. Interleaving writes inside the existing boundaries of a file</p>
+
+<p>makes even <em>less</em> sense to me. I can construct peculiar scenarios in which I can write applications that</p>
+
+<p>explicitly use this feature but they seem artificial.</p>
+
+<p>Writing to a log file at the end seems like it would make sense. But if that’s my goal, it makes more</p>
+
+<p>sense to just use <strong>O_APPEND</strong> mode:</p>
+
+<pre>The file is opened in append mode.  Before each <a href="http://man7.org/linux/man-pages/man2/write.2.html">write(2)</a>, the
+              file offset is positioned at the end of the file, as if with
+              <a href="http://man7.org/linux/man-pages/man2/lseek.2.html">lseek(2)</a>.  The modification of the file offset and the write
+              operation are performed as a single atomic step.
+
+(Source: http://man7.org/linux/man-pages/man2/open.2.html)
+</pre>
+
+<p>Thus, this makes me wonder: could we just eliminate this piece of shared state?  I have a <em>reason</em> for asking this question though I will save discussing that for another time.</p>
+
+<p>Preserving the correct behavior for most applications will require fixing things up in the library – we could eliminate <strong>read</strong> as a system call and provide a library implementation that calls <strong>pread</strong>.</p>
+
+<p>I’m considering doing that and seeing what breaks. it is more difficult to do that in Windows than in Linux, so I’m considering starting there.</p>
